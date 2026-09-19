@@ -91,7 +91,8 @@ test("matching package-manager contract is clean", () => {
 
 test("block, warn and off enforcement have distinct failure semantics", () => {
   const state = (enforcement) => scanFiles(files({ ...npm, ".crosscheck/contract.json": contract([{ key: "package.manager", allowed: ["pnpm"], enforcement }]) }));
-  assert.equal(failing(state("block").findings).some((item) => item.tier === "contract"), true);
+  assert.equal(failing(state("block").findings).some((item) => item.tier === "contract"), false);
+  assert.equal(failing(state("block").findings, { contractEnforcementAuthorized: true }).some((item) => item.tier === "contract"), true);
   assert.equal(failing(state("warn").findings).some((item) => item.tier === "contract"), false);
   assert.equal(state("off").findings.some((item) => item.tier === "contract"), false);
 });
@@ -101,24 +102,25 @@ test("contract pnpm plus package-lock creates a contract violation", () => {
   assert.equal(result.findings.some((item) => item.rule === "contract/violation" && item.values.includes("npm")), true);
 });
 
-test("weak evidence alone does not establish satisfaction but can contradict explicit policy", () => {
+test("weak evidence produces advisory possible-violation or unverified findings", () => {
   const matchingWeak = scanFiles(files({
     "package.json": {},
     ".github/workflows/ci.yml": "on: push\njobs:\n  t:\n    steps:\n      - run: pnpm install --no-frozen-lockfile\n",
     ".crosscheck/contract.json": contract([decision("package.manager", "pnpm")]),
   }));
-  assert.equal(matchingWeak.findings.some((item) => item.rule === "contract/violation"), true);
+  assert.equal(matchingWeak.findings.some((item) => item.rule === "contract/unverified"), true);
   const conflictingWeak = scanFiles(files({
     "package.json": { packageManager: "pnpm@10" }, "pnpm-lock.yaml": true,
     ".github/workflows/ci.yml": "on: push\njobs:\n  t:\n    steps:\n      - run: npm install\n",
     ".crosscheck/contract.json": contract([decision("package.manager", "pnpm")]),
   }));
-  assert.equal(conflictingWeak.findings.some((item) => item.rule === "contract/violation" && item.values.includes("npm")), true);
+  assert.equal(conflictingWeak.findings.some((item) => item.rule === "contract/possible-violation" && item.values.includes("npm")), true);
+  assert.equal(failing(conflictingWeak.findings, { contractEnforcementAuthorized: true }).length, 0);
 });
 
 test("a runtime database driver alone does not establish a database-engine decision", () => {
   const result = scanFiles(files({ "package.json": { dependencies: { pg: "8" } }, ".crosscheck/contract.json": contract([decision("database.engine", "postgresql")]) }));
-  assert.equal(result.findings.some((item) => item.rule === "contract/violation"), true);
+  assert.equal(result.findings.some((item) => item.rule === "contract/unverified"), true);
 });
 
 test("Node 22 contract blocks CI configured for Node 20", () => {
@@ -149,7 +151,7 @@ test("manual database and auth contracts enforce direct repository evidence", ()
     "package.json": { dependencies: { mysql2: "3", "@clerk/nextjs": "6" } },
     ".crosscheck/contract.json": contract([decision("database.engine", "postgresql"), decision("auth.provider", "authjs")]),
   }));
-  assert.deepEqual(result.findings.filter((item) => item.tier === "contract").map((item) => item.class), ["auth.provider", "database.engine"]);
+  assert.deepEqual(result.findings.filter((item) => item.tier === "contract").map((item) => item.class).sort(), ["auth.provider", "database.engine"]);
 });
 
 test("root decision does not inherit into an independent nested package", () => {
@@ -178,7 +180,8 @@ test("PR cannot self-authorize a pnpm to npm migration", () => {
     files({ ...npm, ".crosscheck/contract.json": contract([decision("package.manager", "npm")]) }),
   );
   assert.equal(result.diff.introduced.some((item) => item.rule === "contract/change-unapproved"), true);
-  assert.equal(failing(result.diff.introduced).length > 0, true);
+  assert.equal(failing(result.diff.introduced).length, 0);
+  assert.equal(failing(result.diff.introduced, { contractEnforcementAuthorized: true }).length > 0, true);
 });
 
 test("approved complete migration evaluates the proposed head contract and passes", () => {
@@ -197,7 +200,8 @@ test("approved migration still fails when final state contains npm and pnpm", ()
     files({ ...npm, "pnpm-lock.yaml": true, ".crosscheck/contract.json": contract([decision("package.manager", "npm")]) }),
     { allowContractChange: true },
   );
-  assert.equal(failing(result.diff.introduced).length > 0, true);
+  assert.equal(failing(result.diff.introduced).length > 0, true, "the independent proven mixed-lockfile finding still fails locally");
+  assert.equal(failing(result.diff.introduced, { contractEnforcementAuthorized: true }).length > 0, true);
 });
 
 test("approved contract-only migration fails when repository does not satisfy it", () => {
@@ -221,6 +225,35 @@ test("initial valid contract adoption needs no migration approval but must match
   assert.equal(failing(clean.diff.introduced).length, 0);
   const bad = diffRepositories(files(pnpm), files({ ...pnpm, ".crosscheck/contract.json": contract([decision("package.manager", "npm")]) }));
   assert.equal(bad.diff.introduced.some((item) => item.rule === "contract/violation"), true);
+});
+
+test("strong and weak contract evidence preserve the precision boundary", () => {
+  const pmPolicy = contract([decision("package.manager", "pnpm")]);
+  const weakPm = scanFiles(files({ ...pnpm, ".github/workflows/ci.yml": "steps:\n  - run: npm install\n", ".crosscheck/contract.json": pmPolicy }));
+  assert.equal(weakPm.findings.some((item) => item.rule === "contract/possible-violation"), true);
+  assert.equal(weakPm.findings.some((item) => item.rule === "contract/violation"), false);
+  const strongPm = scanFiles(files({ ...pnpm, ".github/workflows/ci.yml": "steps:\n  - run: npm ci\n", ".crosscheck/contract.json": pmPolicy }));
+  assert.equal(strongPm.findings.some((item) => item.rule === "contract/violation"), true);
+
+  const dbPolicy = contract([decision("database.engine", "postgresql")]);
+  const weakDb = scanFiles(files({ "package.json": { dependencies: { mongodb: "6" } }, "prisma/schema.prisma": "datasource db {\n provider = \"postgresql\"\n}\n", ".crosscheck/contract.json": dbPolicy }));
+  assert.equal(weakDb.findings.some((item) => item.rule === "contract/possible-violation"), true);
+  assert.equal(failing(weakDb.findings, { contractEnforcementAuthorized: true }).length, 0);
+  const strongDb = scanFiles(files({ "package.json": {}, "prisma/schema.prisma": "datasource db {\n provider = \"mysql\"\n}\n", ".crosscheck/contract.json": dbPolicy }));
+  assert.equal(strongDb.findings.some((item) => item.rule === "contract/violation"), true);
+});
+
+test("auth contracts distinguish unverified, satisfied, and strongly contradicted", () => {
+  const authPolicy = contract([decision("auth.provider", "clerk")]);
+  assert.equal(scanFiles(files({ "package.json": {}, ".crosscheck/contract.json": authPolicy })).findings.some((item) => item.rule === "contract/unverified"), true);
+  assert.equal(scanFiles(files({ "package.json": { dependencies: { "@clerk/nextjs": "6" } }, ".crosscheck/contract.json": authPolicy })).findings.some((item) => item.tier === "contract"), false);
+  assert.equal(scanFiles(files({ "package.json": { dependencies: { "next-auth": "5" } }, ".crosscheck/contract.json": authPolicy })).findings.some((item) => item.rule === "contract/violation"), true);
+});
+
+test("generic proven findings still fail locally and experimental findings never do", () => {
+  const result = scanFiles(files({ "package.json": { packageManager: "pnpm@10", dependencies: { "next-auth": "5", "@clerk/nextjs": "6" } }, "pnpm-lock.yaml": true, "package-lock.json": true }));
+  assert.equal(failing(result.findings).some((item) => item.tier === "proven"), true);
+  assert.equal(failing(result.findings).some((item) => item.tier === "experimental"), false);
 });
 
 test("agent context and JSON are deterministic and digest-backed", () => {

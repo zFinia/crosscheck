@@ -149,24 +149,31 @@ export function evaluateContract(contract, evidence) {
     if (decision.enforcement === "off") continue;
     const scope = decision.scope === "." ? "" : decision.scope;
     const relevant = evidence.filter((item) => item.scope === scope && item.class === decision.key && evidenceKinds[decision.key].has(item.kind));
-    const observed = [...new Set(relevant.map((item) => item.value))].sort();
-    const conflicting = relevant.filter((item) => !decision.allowed.includes(item.value));
-    const satisfied = relevant.some((item) => strongKinds[decision.key].has(item.kind) && decision.allowed.includes(item.value));
-    if (satisfied && conflicting.length === 0) continue;
-    const cited = conflicting.length ? conflicting : relevant.length ? relevant : [{ source: CONTRACT_PATH, line: 1, value: "missing", kind: "contract", detail: `no repository evidence satisfies ${decision.key}` }];
+    const strong = relevant.filter((item) => strongKinds[decision.key].has(item.kind));
+    const weak = relevant.filter((item) => !strongKinds[decision.key].has(item.kind));
+    const strongMatching = strong.filter((item) => decision.allowed.includes(item.value));
+    const strongConflicting = strong.filter((item) => !decision.allowed.includes(item.value));
+    const weakConflicting = weak.filter((item) => !decision.allowed.includes(item.value));
+    if (!strongConflicting.length && !weakConflicting.length && strongMatching.length) continue;
+    const rule = strongConflicting.length ? "contract/violation" : weakConflicting.length ? "contract/possible-violation" : "contract/unverified";
+    const cited = strongConflicting.length ? strongConflicting : weakConflicting.length ? weakConflicting : relevant.length ? relevant : [{ source: CONTRACT_PATH, line: 1, value: "missing", kind: "contract", detail: `no strong repository evidence verifies ${decision.key}` }];
+    const observed = [...new Set(cited.filter((item) => item.kind !== "contract").map((item) => item.value))].sort();
     const expected = decision.allowed.join(" or ");
     const actual = observed.length ? observed.join(", ") : "no matching evidence";
+    const description = rule === "contract/violation" ? "violated" : rule === "contract/possible-violation" ? "may be contradicted by weak evidence" : "could not be verified";
     findings.push({
-      id: `contract/violation@${decision.key}@${decision.scope}`,
-      rule: "contract/violation",
+      id: `${rule}@${decision.key}@${decision.scope}`,
+      rule,
       tier: "contract",
       class: decision.key,
       scope,
       expected: decision.allowed,
       values: observed,
-      enforcement: decision.enforcement,
-      summary: `${decisionLabel[decision.key]} decision violated${scope ? ` in ${scope}/` : ""}: expected ${expected}; observed ${actual}`,
-      fix: `Restore ${decisionLabel[decision.key].toLowerCase()} ${expected}${scope ? ` in ${scope}/` : ""}, or propose an explicit contract change for maintainer approval.`,
+      enforcement: rule === "contract/violation" ? decision.enforcement : "warn",
+      summary: `${decisionLabel[decision.key]} decision ${description}${scope ? ` in ${scope}/` : ""}: expected ${expected}; observed ${actual}`,
+      fix: rule === "contract/violation"
+        ? `Restore ${decisionLabel[decision.key].toLowerCase()} ${expected}${scope ? ` in ${scope}/` : ""}, or propose an explicit contract change for maintainer approval.`
+        : `Review the cited evidence and either align it with ${expected} or add strong repository configuration that makes the decision verifiable.`,
       evidence: cited.map((item) => ({ source: item.source, line: item.line ?? null, value: item.value, kind: item.kind, detail: item.detail })),
     });
   }

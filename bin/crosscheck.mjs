@@ -22,14 +22,14 @@ Usage
   crosscheck context [dir]             show agent-readable repository decisions
 Options
   --format text|json|github|markdown   output format (default: text)
-  --fail-on none|new|any               fail on proven or block-level contract findings
+  --fail-on none|new|any               fail on proven findings (and authorized managed contract blocks)
   --experimental                       show experimental findings; they never fail
   --allow-contract-change              approve proposed contract migrations (diff mode only)
   --write                              write .crosscheck/AGENT_CONTEXT.md (context only)
   --force                              replace an existing contract (contract init only)
   -h, --help, -v, --version
 
-Exit codes: 0 ok/advisory · 1 enforced finding matched · 2 usage or runtime error
+Exit codes: 0 ok/advisory · 1 proven finding (or authorized managed contract block) matched · 2 usage or runtime error
 Runs locally and deterministically. Nothing is uploaded.`;
 
 function parseArgs(argv) {
@@ -133,6 +133,7 @@ function main() {
   if (opts.help) { console.log(HELP); return 0; }
   if (opts.version) { console.log(VERSION); return 0; }
   const dir = resolve(opts.dir);
+  const contractEnforcementAuthorized = process.env.GITHUB_ACTIONS === "true" && process.env.CROSSCHECK_MANAGED_MONITORING_AUTHORIZED === "true";
   if (opts.command === "contract-init") return runInit(dir, opts);
   if (opts.command === "contract-suggest") return runSuggest(dir, opts);
   if (opts.command === "context") return runContext(dir, opts);
@@ -142,7 +143,7 @@ function main() {
     const { shown, hiddenExperimental } = selectTiers(full.findings, opts);
     const result = { ...full, findings: shown, hiddenExperimental };
     delete result.evidence;
-    if (opts.format === "json") console.log(JSON.stringify({ version: VERSION, mode: "scan", root: dir, ...result }, null, 2));
+    if (opts.format === "json") console.log(JSON.stringify({ version: VERSION, mode: "scan", root: dir, contractEnforcement: contractEnforcementAuthorized ? "managed" : "preview", ...result }, null, 2));
     else if (opts.format === "markdown") {
       const repository = isGitRepo(dir);
       let commit = null;
@@ -150,11 +151,11 @@ function main() {
       process.stdout.write(renderMarkdown({ result, repoName: basename(repository ? repoRoot(dir) : dir), commit, experimental: opts.experimental, version: VERSION }));
     } else if (opts.format === "github") {
       const scanDiff = { introduced: shown.map((finding) => ({ ...finding, newEvidence: finding.evidence })), existing: [], resolved: [], contractChanges: [] };
-      for (const line of githubAnnotations(scanDiff, { level: opts.failOn === "none" ? "warning" : "error" })) console.log(line);
-      console.log(renderScan(result, { root: dir, experimental: opts.experimental }));
+      for (const line of githubAnnotations(scanDiff, { level: opts.failOn === "none" ? "warning" : "error", contractEnforcementAuthorized })) console.log(line);
+      console.log(renderScan(result, { root: dir, experimental: opts.experimental, contractEnforcementAuthorized }));
       writeOutputs({ introduced: shown.length, resolved: 0, existing: 0, "contract-violations": shown.filter((finding) => finding.rule === "contract/violation").length, "decision-changes": 0, "contract-digest": result.contractDigest || "" });
-    } else console.log(renderScan(result, { root: dir, experimental: opts.experimental }));
-    return opts.failOn === "any" && failing(shown).length ? 1 : 0;
+    } else console.log(renderScan(result, { root: dir, experimental: opts.experimental, contractEnforcementAuthorized }));
+    return opts.failOn === "any" && failing(shown, { contractEnforcementAuthorized }).length ? 1 : 0;
   }
 
   if (!isGitRepo(dir)) throw usage(`--base needs a git repository (${dir} is not one)`);
@@ -177,17 +178,17 @@ function main() {
   const digest = head.authorityContractDigest || head.contractDigest || "";
 
   if (opts.format === "json") {
-    console.log(JSON.stringify({ version: VERSION, mode: "diff", base: baseCommit.sha, head: headSha, introduced: diff.introduced, resolved: diff.resolved, existing: diff.existing, hiddenExperimental: diff.hiddenExperimental, model: head.model, contract: head.authorityContract || head.contract || null, proposedContract: head.authorityContract && head.contract ? head.contract : undefined, contractDigest: digest || null, contractChanges: diff.contractChanges, contractChangeApproved: diff.contractChangeApproved }, null, 2));
+    console.log(JSON.stringify({ version: VERSION, mode: "diff", base: baseCommit.sha, head: headSha, contractEnforcement: contractEnforcementAuthorized ? "managed" : "preview", introduced: diff.introduced, resolved: diff.resolved, existing: diff.existing, hiddenExperimental: diff.hiddenExperimental, model: head.model, contract: head.authorityContract || head.contract || null, proposedContract: head.authorityContract && head.contract ? head.contract : undefined, contractDigest: digest || null, contractChanges: diff.contractChanges, contractChangeApproved: diff.contractChangeApproved }, null, 2));
   } else if (opts.format === "markdown") {
     process.stdout.write(renderMarkdown({ result: head, diff, head, repoName: basename(top), base: baseCommit.sha, headSha, experimental: opts.experimental, version: VERSION }));
   } else if (opts.format === "github") {
     const advisory = opts.failOn === "none";
-    for (const line of githubAnnotations(diff, { level: advisory ? "warning" : "error" })) console.log(line);
-    console.log(renderDiff(diff, head, { base: baseCommit.sha, headLabel, experimental: opts.experimental }));
+    for (const line of githubAnnotations(diff, { level: advisory ? "warning" : "error", contractEnforcementAuthorized })) console.log(line);
+    console.log(renderDiff(diff, head, { base: baseCommit.sha, headLabel, experimental: opts.experimental, contractEnforcementAuthorized }));
     if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, githubSummary(diff, head, { base: baseCommit.sha, headSha, advisory, experimental: opts.experimental }) + "\n");
     writeOutputs({ introduced: diff.introduced.length, resolved: diff.resolved.length, existing: diff.existing.length, "contract-violations": diff.introduced.filter((finding) => finding.rule === "contract/violation").length, "decision-changes": diff.contractChanges.length, "contract-digest": digest });
-  } else console.log(renderDiff(diff, head, { base: baseCommit.sha, headLabel, experimental: opts.experimental }));
-  return (opts.failOn === "new" || opts.failOn === "any") && failing(diff.introduced).length ? 1 : 0;
+  } else console.log(renderDiff(diff, head, { base: baseCommit.sha, headLabel, experimental: opts.experimental, contractEnforcementAuthorized }));
+  return (opts.failOn === "new" || opts.failOn === "any") && failing(diff.introduced, { contractEnforcementAuthorized }).length ? 1 : 0;
 }
 
 try { process.exitCode = main(); }

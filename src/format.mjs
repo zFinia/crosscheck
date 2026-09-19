@@ -54,9 +54,9 @@ function findingLines(f, { indent = "  " } = {}) {
   return out;
 }
 
-export function renderScan(result, { root, experimental }) {
+export function renderScan(result, { root, experimental, contractEnforcementAuthorized = false }) {
   const lines = ["CrossCheck repository model", `(${root})`, ""];
-  if (result.contract) lines.push("Repository contract:", "  Decision contract: active", `  Contract digest: ${result.contractDigest}`, `  Decisions: ${result.contract.decisions.length}`, "");
+  if (result.contract) lines.push("Repository contract:", "  Decision contract: active", `  Enforcement: ${contractEnforcementAuthorized ? "managed monitoring" : "preview (automatic contract blocking requires managed monitoring)"}`, `  Contract digest: ${result.contractDigest}`, `  Decisions: ${result.contract.decisions.length}`, "");
   lines.push(...modelLines(result.model, { experimental }), "");
   if (!result.findings.length) {
     lines.push("Contradictions: none");
@@ -69,10 +69,10 @@ export function renderScan(result, { root, experimental }) {
   return lines.join("\n").trimEnd();
 }
 
-export function renderDiff(diff, head, { base, headLabel, experimental }) {
+export function renderDiff(diff, head, { base, headLabel, experimental, contractEnforcementAuthorized = false }) {
   const lines = [`CrossCheck: ${base.slice(0, 12)} → ${headLabel}`, ""];
   const digest = head.authorityContractDigest || head.contractDigest;
-  if (digest) lines.push(`Repository decision contract: ${digest}`, "");
+  if (digest) lines.push(`Repository decision contract: ${digest}`, `Contract enforcement: ${contractEnforcementAuthorized ? "managed monitoring" : "preview (automatic blocking requires managed monitoring)"}`, "");
   if (diff.contractChanges?.length) {
     lines.push("Repository decision changes:");
     for (const change of diff.contractChanges) lines.push(`  - ${changeText(change)} — ${change.requiresApproval ? (diff.contractChangeApproved ? "approved" : "approval required") : "adopted/tightened"}`);
@@ -111,6 +111,8 @@ const MEANING = {
   "database/agent-instructions": "Agent instruction files name a different database from the one that is configured.",
   "manifest/unparseable": "A package.json file is not valid JSON, so its dependencies could not be checked (package managers cannot read it either).",
   "contract/violation": "The repository state does not satisfy an explicit decision committed in the CrossCheck contract.",
+  "contract/possible-violation": "Weak repository evidence may conflict with an explicit decision. This is always advisory.",
+  "contract/unverified": "CrossCheck did not find strong repository evidence that verifies this explicit decision. This is always advisory.",
   "contract/change-unapproved": "An established repository decision is being changed or removed without explicit maintainer approval.",
 };
 const mdCode = (s) => `\`${String(s).replace(/`/g, "'")}\``;
@@ -188,7 +190,7 @@ export function renderMarkdown({ result, diff = null, head = null, repoName, com
   if (activeContract || contracted.length || diff?.contractChanges?.length) {
     md.push("## Repository decision contract", "");
     if (activeContract) {
-      md.push(`- **Contract:** ${mdCode(CONTRACT_PATH)}`, `- **Schema version:** ${activeContract.version}`, `- **SHA-256:** ${mdCode(activeDigest)}`, `- **Decisions:** ${activeContract.decisions.length}`, "", "| Scope | Decision | Allowed | Enforcement |", "|---|---|---|---|");
+      md.push(`- **Contract:** ${mdCode(CONTRACT_PATH)}`, "- **Enforcement:** preview; automatic contract blocking requires managed monitoring", `- **Schema version:** ${activeContract.version}`, `- **SHA-256:** ${mdCode(activeDigest)}`, `- **Decisions:** ${activeContract.decisions.length}`, "", "| Scope | Decision | Allowed | Enforcement |", "|---|---|---|---|");
       for (const decision of activeContract.decisions) md.push(`| ${mdCode(decision.scope)} | ${mdCode(decision.key)} | ${decision.allowed.map(pretty).join(", ")} | ${decision.enforcement} |`);
       md.push("");
     }
@@ -225,7 +227,7 @@ const esc = (s) => String(s).replace(/%/g, "%25").replace(/\r/g, "%0D").replace(
 const escProp = (s) => esc(s).replace(/:/g, "%3A").replace(/,/g, "%2C");
 
 /** Workflow commands: one annotation per NEW contradiction, on the file that introduced it. */
-export function githubAnnotations(diff, { level = "warning" } = {}) {
+export function githubAnnotations(diff, { level = "warning", contractEnforcementAuthorized = false } = {}) {
   const out = [];
   for (const f of diff.introduced) {
     const anchor = (f.newEvidence?.find((e) => e.source) || f.evidence[0] || { source: CONTRACT_PATH, line: 1 });
@@ -235,7 +237,7 @@ export function githubAnnotations(diff, { level = "warning" } = {}) {
     props.push(`title=${escProp(`CrossCheck${f.tier === "experimental" ? " (experimental)" : ""}: ${f.summary}`)}`);
     const body = [...f.evidence.map((e) => `${e.source}${e.line ? `:${e.line}` : ""} → ${pretty(e.value)} (${e.detail})`), `Fix: ${f.fix}`].join("\n");
     // Experimental rules are notices at most, whatever the enforcement level.
-    const annotationLevel = f.tier === "experimental" ? "notice" : f.tier === "contract" && f.enforcement === "warn" ? "warning" : level;
+    const annotationLevel = f.tier === "experimental" ? "notice" : f.tier === "contract" && (!contractEnforcementAuthorized || f.enforcement === "warn") ? "warning" : level;
     out.push(`::${annotationLevel} ${props.join(",")}::${esc(body)}`);
   }
   return out;
@@ -264,7 +266,7 @@ export function githubSummary(diff, head, { base, headSha, advisory, experimenta
   }
   if (diff.resolved.length) md.push("", `Resolved by this PR: ${diff.resolved.map((f) => f.summary).join("; ")}`);
   if (diff.existing.length) md.push("", `${diff.existing.length} pre-existing contradiction${diff.existing.length === 1 ? "" : "s"} not caused by this PR (not reported as new).`);
-  md.push("", "<details><summary>Repository model</summary>", "", "```", ...modelLines(head.model, { experimental }), "```", "", `Compared \`${base.slice(0, 12)}\` → \`${headSha.slice(0, 12)}\`. Runs entirely in this workflow; no repository data leaves it.`, "</details>");
+  md.push("", "<details><summary>Repository model</summary>", "", "```", ...modelLines(head.model, { experimental }), "```", "", `Compared \`${base.slice(0, 12)}\` → \`${headSha.slice(0, 12)}\`. Scanning stays in this workflow; the managed Action sends only GitHub-signed repository identity for entitlement authorization.`, "</details>");
   return md.join("\n");
 }
 

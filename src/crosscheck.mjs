@@ -79,4 +79,8 @@ export function selectTiers(findings, { experimental = false } = {}) {
   const shown = findings.filter((f) => f.tier === "proven" || f.tier === "contract" || experimental);
   return { shown, hiddenExperimental: findings.length - shown.length };
 }
-export const failing = (findings) => findings.filter((f) => f.tier === "proven" || (f.tier === "contract" && f.enforcement === "block"));
+export const failing = (findings, { contractEnforcementAuthorized = false } = {}) => findings.filter((f) => {
+  if (f.tier === "proven") return true;
+  if (!contractEnforcementAuthorized || f.tier !== "contract") return false;
+  return (f.rule === "contract/violation" && f.enforcement === "block") || f.rule === "contract/change-unapproved";
+});

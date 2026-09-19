@@ -47,6 +47,9 @@ outputs:
 runs:
   using: composite
   steps:
+    - id: authorize
+      shell: bash
+      run: node "$GITHUB_ACTION_PATH/bin/action-authorize.mjs"
     - id: crosscheck
       shell: bash
       working-directory: ${{ inputs.working-directory }}
@@ -55,6 +58,7 @@ runs:
         CC_EXPERIMENTAL: ${{ inputs.experimental }}
         CC_ALLOW_CONTRACT_CHANGE: ${{ inputs.allow-contract-change == 'true' || contains(github.event.pull_request.labels.*.name, 'crosscheck:decision-change') }}
         CC_BASE: ${{ inputs.base || github.event.pull_request.base.sha || github.event.before }}
+        CROSSCHECK_MANAGED_MONITORING_AUTHORIZED: ${{ steps.authorize.outputs.authorized }}
       run: |
         set -euo pipefail
         cli="$GITHUB_ACTION_PATH/bin/crosscheck.mjs"

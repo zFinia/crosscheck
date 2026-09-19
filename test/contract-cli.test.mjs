@@ -74,7 +74,8 @@ test("CLI enforces base-contract authority and explicit migration approval", () 
   const base = git(dir, "rev-parse", "HEAD").trim();
   commit(dir, { "package.json": { packageManager: "npm@11" }, "pnpm-lock.yaml": null, "package-lock.json": "{}\n", ".crosscheck/contract.json": policy("npm") }, "migrate");
   const blocked = cli(dir, "--base", base, "--head", "HEAD", "--fail-on", "new", "--format", "json");
-  assert.equal(blocked.code, 1);
+  assert.equal(blocked.code, 0);
+  assert.equal(blocked.json().contractEnforcement, "preview");
   assert.equal(blocked.json().introduced.some((item) => item.rule === "contract/change-unapproved"), true);
   const approved = cli(dir, "--base", base, "--head", "HEAD", "--allow-contract-change", "--fail-on", "new", "--format", "json");
   assert.equal(approved.code, 0);
@@ -93,7 +94,7 @@ test("GitHub annotation anchors a contract violation to introduced evidence", ()
   const base = git(dir, "rev-parse", "HEAD").trim();
   commit(dir, { "package-lock.json": "{}\n" });
   const result = cli(dir, "--base", base, "--head", "HEAD", "--format", "github", "--fail-on", "new");
-  assert.equal(result.code, 1);
+  assert.equal(result.code, 1, "the independent proven package-manager conflict still fails locally");
   assert.match(result.out, /^::error file=package-lock\.json,line=1,title=CrossCheck/m);
 });
 
@@ -102,7 +103,7 @@ test("unapproved migration annotation anchors to the contract", () => {
   const base = git(dir, "rev-parse", "HEAD").trim();
   commit(dir, { ".crosscheck/contract.json": policy("npm") });
   const result = cli(dir, "--base", base, "--head", "HEAD", "--format", "github", "--fail-on", "new");
-  assert.match(result.out, /^::error file=\.crosscheck\/contract\.json,line=1,title=/m);
+  assert.match(result.out, /^::warning file=\.crosscheck\/contract\.json,line=1,title=/m);
   assert.match(result.out, /repository decision changes/i);
 });
 

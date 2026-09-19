@@ -22,7 +22,9 @@ The schema is [`crosscheck-contract-v1.schema.json`](crosscheck-contract-v1.sche
 - `database.engine`
 - `auth.provider`
 
-Each decision has a non-empty `allowed` list. `scope` defaults to `.`, `enforcement` defaults to `warn`, and supported enforcement levels are `block`, `warn`, and `off`. Invalid contracts fail closed.
+Each decision has a non-empty `allowed` list. `scope` defaults to `.`, `enforcement` defaults to `warn`, and supported enforcement levels are `block`, `warn`, and `off`. Invalid contracts fail closed. A `block` decision is block-capable only in an authorized managed Action; the community CLI presents contract enforcement as a local preview.
+
+Strong conflicting evidence produces `contract/violation`. Weak conflicting evidence produces the always-advisory `contract/possible-violation`. If no strong evidence confirms or contradicts a decision, CrossCheck reports the always-advisory `contract/unverified` rather than treating missing evidence as failure.
 
 ```json
 {
