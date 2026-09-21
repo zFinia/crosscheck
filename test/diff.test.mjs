@@ -14,6 +14,9 @@ test("a PR that adds package-lock.json to a pnpm repo introduces one package-man
   assert.equal(r.introduced[0].rule, "package-manager/conflicting-config");
   assert.deepEqual(r.introduced[0].values, ["npm", "pnpm"]);
   assert.deepEqual(r.introduced[0].newEvidence.map((e) => e.source), ["package-lock.json"]);
+  assert.equal(r.introduced[0].summary, "Multiple package-manager configurations detected: npm and pnpm");
+  assert.match(r.introduced[0].fix, /"packageManager" declares pnpm/);
+  assert.match(r.introduced[0].fix, /If pnpm is authoritative and the other state was introduced unintentionally, remove package-lock\.json/);
   assert.equal(r.existing.length, 0);
 });
 
@@ -26,7 +29,7 @@ test("an unrelated PR on an already-conflicted repo is not blamed for the old co
   assert.equal(r.existing.length, 1);
   assert.equal(r.resolved.length, 0);
   const text = cli(dir, "--base", base, "--head", "HEAD").out;
-  assert.match(text, /New contradictions: none/);
+  assert.match(text, /New findings: none/);
   assert.match(text, /Pre-existing \(not caused by this change/);
 });
 

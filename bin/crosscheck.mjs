@@ -16,7 +16,7 @@ const HELP = `crosscheck ${VERSION} — repository decision contracts and consis
 Usage
   crosscheck [dir]                     scan the working tree
   crosscheck --base <ref> [--head <ref>]
-                                       report only contradictions a change introduced
+                                       report only findings a change introduced
   crosscheck contract init [dir]       create a safe initial decision contract
   crosscheck contract suggest [dir]    show optional policy candidates
   crosscheck context [dir]             show agent-readable repository decisions
