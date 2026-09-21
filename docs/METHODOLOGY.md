@@ -18,6 +18,8 @@ CrossCheck shows a rule by default only after its cited configuration evidence h
 
 The 47/47 evidence result does not state how many findings required remediation. Two counterexamples are deliberate multi-manager repositories: `code-yeongyu/senpi@1690fdb284dacca7ddea901db02d97ea0771eecf` tests and releases through multiple package managers, while `MattFlower/tempest@a53ed0e94d3bb215aa2902c09d44662ddfc405b7` intentionally keeps an npm lock for Dependabot alongside Bun. The experimental rules remain opt-in and never fail a build.
 
+For 0.x compatibility, the default rule remains block-capable when an operator explicitly selects `--fail-on new` or `--fail-on any`. This is a strict evidence-based policy and can block deliberate multi-manager state; it does not imply that CrossCheck inferred an error. Intent-aware enforcement requires an explicit CrossCheck contract. Deliberately supported multi-manager changes should leave generic `fail-on` disabled.
+
 The complete frozen manifests, raw 0.1.1 outputs, per-finding evidence-review records, SHA-256 hashes, and dependency-free verifier are published in the [September 2026 public-repository benchmark](../benchmark/ai-agent-repositories-2026-09/README.md). The artifact records all 1,027 sampled repositories, including the 80-repository tuning set, the 947-repository holdout, and three skipped scans. Run `npm run benchmark:verify` to recompute the published totals from the raw files.
 
 ## Install-step evidence (0.1.1)

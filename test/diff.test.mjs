@@ -128,6 +128,31 @@ test("--fail-on new exits 1 only when something new is introduced; default is ad
   assert.equal(cli(dir, "--base", base, "--head", "HEAD", "--fail-on", "new").code, 0);
 });
 
+test("deliberate multi-manager state is advisory by default and strict only with fail-on new", () => {
+  const dir = repo({ "package.json": { name: "compatibility-fixture", private: true } });
+  const base = git(dir, "rev-parse", "HEAD").trim();
+  commit(dir, {
+    "package.json": {
+      name: "compatibility-fixture",
+      private: true,
+      scripts: { "build:npm": "npm ci", "build:bun": "bun install", "verify:pms": "node verify.mjs" },
+    },
+    "package-lock.json": "{}\n",
+    "bun.lock": "# deliberate Bun compatibility state\n",
+    ".github/workflows/npm.yml": "on: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm ci\n",
+    ".github/workflows/bun.yml": "on: push\njobs:\n  test:\n    runs-on: ubuntu-latest\n    steps:\n      - run: bun install --frozen-lockfile\n",
+  }, "add deliberate npm and Bun compatibility coverage");
+
+  const advisory = cli(dir, "--base", base, "--head", "HEAD");
+  assert.equal(advisory.code, 0);
+  assert.match(advisory.out, /Multiple package-manager configurations detected: Bun and npm/);
+  assert.match(advisory.out, /may be deliberate compatibility coverage/);
+
+  const strict = cli(dir, "--base", base, "--head", "HEAD", "--fail-on", "new");
+  assert.equal(strict.code, 1);
+  assert.match(strict.out, /Multiple package-manager configurations detected: Bun and npm/);
+});
+
 test("usage errors exit 2 with a clear message", () => {
   const dir = repo(PNPM);
   const r = cli(dir, "--base", "does-not-exist");

@@ -76,3 +76,5 @@ Approval permits only the proposed migration. If the resulting repository still 
 ## Evidence boundary
 
 Default rules must cite configuration evidence that exists in the scanned repository. That evidence does not, by itself, establish maintainer intent or that a finding requires remediation. Generic ORM, database, auth, install-command, and agent-instruction rules remain experimental and cannot fail a build. An explicit contract may enforce those decisions because the repository owner—not CrossCheck's heuristic—declared the policy.
+
+`--fail-on new` and `--fail-on any` are separate, strict opt-in policies for default findings. They preserve 0.x behavior by treating every matching multi-manager configuration state as block-capable, including state that maintainers deliberately keep for compatibility or dependency tooling. They do not become intent-aware merely because remediation text is conditional. Repositories that need enforcement based on maintainer intent must record that intent in `.crosscheck/contract.json` and use contract enforcement; generic `fail-on` should remain disabled for deliberately supported multi-manager changes.

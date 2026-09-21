@@ -132,7 +132,7 @@ jobs:
 
 That is the whole setup. On this path the Action makes **no network calls of its own**: it reads the repository already checked out on your runner and writes a warning to the pull request when a change introduces a package-manager contradiction. Nothing leaves the runner.
 
-By default it only warns. To fail the check when a change *introduces* a default finding:
+By default it only warns. `fail-on: new` and `fail-on: any` are strict opt-in policies: they block matching default findings based on configuration evidence, including deliberate multi-manager compatibility state. CrossCheck does not infer intent before applying this operator-selected policy. To fail the check when a change *introduces* a default finding:
 
 ```yaml
       - uses: zFinia/crosscheck@v0
@@ -140,7 +140,7 @@ By default it only warns. To fail the check when a change *introduces* a default
           fail-on: new
 ```
 
-Existing contradictions never fail an unrelated pull request — only what the change introduces. See [exit codes](#exit-codes).
+With `fail-on: new`, existing findings never fail an unrelated pull request—only what the change introduces. `fail-on: any` can also block pre-existing findings. If enforcement must reflect repository intent instead of treating all multi-manager configuration state strictly, record that intent in an explicit CrossCheck contract and use contract enforcement; leave generic `fail-on` disabled for deliberately supported multi-manager changes. See [exit codes](#exit-codes).
 
 ### Repository decision contracts (preview)
 
@@ -216,7 +216,7 @@ Ambiguous Node expressions such as `>=18`, `lts/*`, dynamic matrices and ranges 
 
 ## Exit codes
 
-`0` ok/advisory · `1` a default finding matched locally, or an authorized managed Action matched a block-level contract finding, with `--fail-on new|any` · `2` usage, invalid policy or runtime error.
+`0` ok/advisory · `1` a default finding matched locally, or an authorized managed Action matched a block-level contract finding, with `--fail-on new|any` · `2` usage, invalid policy or runtime error. `--fail-on new|any` is strict and evidence-based: it can block deliberate multi-manager state. Intent-aware enforcement requires an explicit CrossCheck contract; do not opt into generic `fail-on` for deliberate multi-manager changes that should remain advisory.
 
 ## Versions
 
