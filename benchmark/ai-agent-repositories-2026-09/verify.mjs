@@ -14,7 +14,9 @@ const sets = [
 ];
 
 const readJson = (path) => JSON.parse(readFileSync(path, "utf8"));
-const sha256 = (path) => createHash("sha256").update(readFileSync(path)).digest("hex");
+const sha256 = (path) => createHash("sha256")
+  .update(readFileSync(path, "utf8").replace(/\r\n/gu, "\n"))
+  .digest("hex");
 const totals = {
   repositories: 0,
   holdoutRepositories: 0,

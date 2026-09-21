@@ -37,16 +37,16 @@
     "Manual confirmation is published as a review record; independent readers can inspect each cited public repository and commit."
   ],
   "sha256": {
-    "results/holdout-v2.json": "7a3a28055746cf3e8269ea4f424d8e6ecd1596e6adcbabaacc2e906c86469b7d",
-    "results/holdout-v3.json": "700ee0b065753596694c06191f45f1d54b963f6174a8175f28be9efe6d5d9881",
-    "results/holdout-v4.json": "f14f2e426c4e3708c5b6bc179bb36075bf7d75fbd7f6ced652d58c1cc227cbc3",
-    "results/holdout-v5.json": "182d539790dadd1237795f2f0826d219f1c7df46afa3f17b3ce25521f5a6035e",
-    "results/tuning-v1.json": "b2fc1f89b3e625b8619ff8db575458c8205f5f8e5da0fb946d77319e30111b60",
+    "results/holdout-v2.json": "3306f9411de8359a86ed7594ebd5f1aa0a63a83a53d9156ef4c3b70e65fa5eb2",
+    "results/holdout-v3.json": "a9085617b39bea44c6e697939650654a8dfe343bd65ba2697106ad97170f049e",
+    "results/holdout-v4.json": "49b68ec89a3e309fc40dcff870ccde860f06ac6276e72dfb9cc660dfc0a174b1",
+    "results/holdout-v5.json": "2e29b0456981317ccfb5ff28407cd81986b7544106f15a4148da243f2ed944a7",
+    "results/tuning-v1.json": "d96ecfc05e79254d399e84805cccaf078769ac4b000b38e482ac29ae201cb23a",
     "reviews/holdout-proven.json": "d1ab755d71fde43a6221af2f696aece65cb4960c9694fdc2d0a5c6a7ad4bb48c",
-    "samples/holdout-v2.json": "3d8d6c0dbb8aa48be0154ece69fd4b9baff7b1626b9ada3f13603881a9cccb4a",
-    "samples/holdout-v3.json": "279ffe3ff9c7438a75ec46c4457865df0be5ab0060e00598be6331dfc9ef12d0",
-    "samples/holdout-v4.json": "afc78a46585989eaa268f05bb48e9fbd089b88e0f7aeb552978b92486ca8b660",
-    "samples/holdout-v5.json": "1389e5fa661492f4b5b95cd3f303ddbab250cf0dc272f537fab83ca7fc8437a6",
-    "samples/tuning-v1.json": "bff7277c8637cf3dabefe5e53ce97ab93a437a0f11e29ad657b95540fbbe22b7"
+    "samples/holdout-v2.json": "4926c1665291d4c7f4acc1cd7280a7a62e106929935201b82fec8360ebc43a33",
+    "samples/holdout-v3.json": "da9622750c8a9c782f8b9a2d58606618ce04f7ef2f98cebb16972edcf00ab9c7",
+    "samples/holdout-v4.json": "f625e0abc9766a1ec12b425f0182c4cbc85c4e54f3022cade975475a9bca731c",
+    "samples/holdout-v5.json": "d0234e794033b65aa2a325c3ba10558437defd3cb0637de33963d2cdc0d34215",
+    "samples/tuning-v1.json": "f476c1861385d9006d4b94b506074d0a476724c93be01acb235402dbd2dcf246"
   }
 }
