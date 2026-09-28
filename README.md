@@ -14,6 +14,8 @@ With a committed `.crosscheck/contract.json`, CrossCheck also evaluates explicit
 
 ## Run it
 
+> **Release status.** The latest release is **0.1.1**: the npm package `@zfinia/crosscheck` and the Action tag `zFinia/crosscheck@v0`. Scanning, `--base` diff mode, `--format` and the basic Action below all work on it. Contracts (`contract init`, `contract suggest`, `.crosscheck/contract.json`), `context`, and the Action inputs `managed-monitoring` and `allow-contract-change` are in **0.2.0, which is on `main` but not yet released**. 0.1.1 does not have those subcommands: it treats `contract` or `context` as a directory path and prints an empty scan. To use them today, run the reviewed commit directly, for example `npx https://github.com/zFinia/crosscheck/archive/bb8ae90b0831b64150e0273086bbe28a8b2f89a4.tar.gz contract init`, and pin the Action to `zFinia/crosscheck@bb8ae90b0831b64150e0273086bbe28a8b2f89a4`.
+
 ```sh
 npx @zfinia/crosscheck                                  # scan this repository
 npx @zfinia/crosscheck --base origin/main               # what did my branch introduce?
@@ -243,7 +245,7 @@ Ambiguous Node expressions such as `>=18`, `lts/*`, dynamic matrices and ranges 
 
 ## Versions
 
-`zFinia/crosscheck@v0` always points at the latest reviewed `0.x` release, and is moved only after that release has passed the test suite and a pull-request smoke test on GitHub-hosted runners. For a fixed version, pin `zFinia/crosscheck@v0.2.0` or a full commit SHA. The npm package uses the same version numbers.
+`zFinia/crosscheck@v0` always points at the latest reviewed `0.x` release, and is moved only after that release has passed the test suite and a pull-request smoke test on GitHub-hosted runners. It currently points at **v0.1.1**. For a fixed version, pin `zFinia/crosscheck@v0.1.1` or a full commit SHA; the 0.2.0 features described above need `zFinia/crosscheck@bb8ae90b0831b64150e0273086bbe28a8b2f89a4` until 0.2.0 is released. The npm package uses the same version numbers.
 
 The Action runs with the runner's own Node.js (18 or later), which GitHub-hosted runners provide.
 
